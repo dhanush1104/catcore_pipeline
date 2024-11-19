@@ -1,0 +1,62 @@
+name: CatCore/tests
+on:
+  push:
+    branches:
+    - main
+jobs:
+  catcore_shared:
+    name: CatCore.Shared
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - uses: actions/setup-dotnet@v4.0.0
+      with:
+        dotnet-version: 7.0.x
+    - uses: actions/checkout@v4.1.0
+    - name: Build CatCore.Shared
+      run: dotnet build CatCore.Shared --configuration Release
+  catcore:
+    name: CatCore
+    needs:
+    - catcore_shared
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - uses: actions/setup-dotnet@v4.0.0
+      with:
+        dotnet-version: 7.0.x
+    - uses: actions/checkout@v4.1.0
+    - name: Authenticate with GitHub Package Registry
+      run: dotnet nuget update source "ErisApps GH Packages" --username ${{ env.Build_Repository_Owner }} --password ${{ env.GitHub_Token }} --store-password-in-clear-text
+    - name: Rename Constants.user.cs.example to Constants.user.cs
+      run: find ${{ github.workspace }} -type f -name Constants.user.cs.example -execdir mv Constants.user.cs.example Constants.user.cs \;
+    - name: Replace Placeholders in Constants.user.cs
+      run: |-
+        find ${{ github.workspace }} -type f -name Constants.user.cs -exec sed -i "s|{{ CATCORE_AUTH_SERVER_URI }}|${{ env.CATCORE_AUTH_SERVER_URI }}|" {} \;
+        find ${{ github.workspace }} -type f -name Constants.user.cs -exec sed -i "s|{{ TWITCH_CLIENT_ID }}|${{ env.TWITCH_CLIENT_ID }}|" {} \;
+    - name: Build CatCore
+      run: dotnet build CatCore --configuration Release
+    - name: Set Build Output Variables
+      run: |-
+        echo "##vso[task.setvariable variable=BUILDTEXT]Filename=${{ github.run_id }}"
+        echo "##vso[task.setvariable variable=ASSEMBLYNAME]AssemblyName=CatCore"
+    - uses: actions/upload-artifact@v4.1.0
+      with:
+        name: CatCoreBuild
+        path: "${{ runner.temp }}"
+  catcore_azure:
+    name: CatCore.Azure
+    needs:
+    - catcore_shared
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - uses: actions/setup-dotnet@v4.0.0
+      with:
+        dotnet-version: 7.0.x
+    - uses: actions/checkout@v4.1.0
+    - name: Build CatCore.Azure
+      run: dotnet build CatCore.Azure --configuration Release
